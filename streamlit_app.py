@@ -1,18 +1,41 @@
-import streamlit 
-import pandas
+# Import python packages
+import streamlit as st
+from snowflake.snowpark.context import get_active_session
+from snowflake.snowpark.functions import col
 
-streamlit.title('My Parents new Healthy Diner')
-streamlit.header('Breakfast Menu')
-streamlit.text('🥣 Kale, Spinach & Rocket smoothie')
-streamlit.text('🥗Hard Boiled egg free range egg')
-streamlit.text('🥑🍞Avacado toast')
+# Write directly to the app
+st.title("🥤Customise your smoothie🥤")
+st.write(
+    """Choose the fruits you want in your custom smoothie!
+    """
+)
 
-streamlit.header('🍌🥭 Build Your Own Fruit Smoothie 🥝🍇')
+name_on_order = st.text_input("Name on Smoothie")
+st.write("The Name on your smoothie will be: ", name_on_order)
 
-my_fruit_list = pandas.read_csv("https://uni-lab-files.s3.us-west-2.amazonaws.com/dabw/fruit_macros.txt")
-my_fruit_list = my_fruit_list.set_index('Fruit')
+session = get_active_session()
+my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
+# st.dataframe(data=my_dataframe, use_container_width=True)
 
-# Let's put a pick list here so they can pick the fruit they want to include 
-fruits_selected= streamlit.multiselect("Pick some fruits:", list(my_fruit_list.index), ['Avocado', 'Strawberries'])
-fruits_to_show = my_fruit_list.loc[fruits_selected]
-streamlit.dataframe(fruits_to_show)
+ingredients_list = st.multiselect('Choose up to 5 ingredients:', my_dataframe, max_selections = 5)
+
+ingredients_string = ''
+if ingredients_list:
+    st.write(ingredients_list)
+    st.text(ingredients_list)
+
+    for fruit_chosen in ingredients_list:
+        ingredients_string += fruit_chosen + ' '
+    # st.write(ingredients_string)
+
+my_insert_stmt = """INSERT INTO smoothies.public.orders(ingredients, name_on_order)
+            VALUES ('""" + ingredients_string.strip() + """', '""" + name_on_order + """')"""
+
+# st.write(my_insert_stmt)
+
+time_to_insert = st.button('Submit Order')
+
+if time_to_insert:
+    session.sql(my_insert_stmt).collect()
+    st.success('Your Smoothie is ordered!', icon="✔")
+
